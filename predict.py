@@ -43,14 +43,14 @@ def combine_figures(text, merge_figures):
     return out
 
 
-def predict(pdf, checkpoint, merge_figures, out, markdown=False):
+def predict(pdf, model, merge_figures, out, markdown=False):
     pdf = Path(pdf)
-    if checkpoint is None or not checkpoint.exists():
-        checkpoint = get_checkpoint(checkpoint)
-    model = NougatModel.from_pretrained(checkpoint).to(torch.bfloat16)
-    if torch.cuda.is_available():
-        model.to("cuda")
-    model.eval()
+    if model is None:
+        checkpoint = get_checkpoint(None)
+        model = NougatModel.from_pretrained(checkpoint).to(torch.bfloat16)
+        if torch.cuda.is_available():
+            model.to("cuda")
+        model.eval()
     if not pdf.exists():
         ValueError()
     out_file = Path(out)

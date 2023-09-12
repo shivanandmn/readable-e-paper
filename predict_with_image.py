@@ -65,19 +65,20 @@ def dump_cropped_images(pdf_file):
     return fig_meta_file
 
 
-def predict_save():
+def predict_save(model=None):
     pdf_file = "pdf_dir/2308.13418.pdf"
     pdf_name = pdf_file.split("/")[-1][:-4]
     loaded_figs = dump_cropped_images(pdf_file)
     merge_figures = json.load(open(loaded_figs))["figures"]
     out_file = predict(
         pdf_file,
-        checkpoint=None,
+        model=model,
         merge_figures=merge_figures,
         out="output/" + pdf_name,
         markdown=False,
     )
     call(["md-to-pdf", str(out_file)])
+    return str(out_file.with_suffix(".pdf"))
 
 
 if __name__ == "__main__":

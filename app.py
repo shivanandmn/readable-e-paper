@@ -20,9 +20,9 @@ from nougat.postprocessing import markdown_compatible, close_envs
 from nougat.utils.dataset import ImageDataset
 from nougat.utils.checkpoint import get_checkpoint
 from nougat.dataset.rasterize import rasterize_paper
-from tqdm import tqdm
+from predict_with_image import predict_save
 
-SAVE_DIR = Path("./pdfs")
+SAVE_DIR = Path("./pdf_dir")
 BATCHSIZE = os.environ.get("NOUGAT_BATCHSIZE", 6)
 NOUGAT_CHECKPOINT = get_checkpoint()
 if NOUGAT_CHECKPOINT is None:
@@ -68,102 +68,37 @@ def root():
 
 @app.post("/predict/")
 async def predict(
-    file: UploadFile = File(...), start: int = None, stop: int = None
-) -> str:
+    file: UploadFile = File(...)
+) -> dict:
     """
     Perform predictions on a PDF document and return the extracted text in Markdown format.
 
     Args:
         file (UploadFile): The uploaded PDF file to process.
-        start (int, optional): The starting page number for prediction.
-        stop (int, optional): The ending page number for prediction.
 
     Returns:
-        str: The extracted text in Markdown format.
+        dict: 
     """
     pdfbin = file.file.read()
     pdf = fitz.open("pdf", pdfbin)
-    md5 = hashlib.md5(pdfbin).hexdigest()
-    save_path = SAVE_DIR / md5
+    print("pdf_dir/" + str(pdf.name))
+    pdf.save("pdf_dir/2308.13418.pdf")
+    
 
-    if start is not None and stop is not None:
-        pages = list(range(start - 1, stop))
-    else:
-        pages = list(range(len(pdf)))
-    predictions = [""] * len(pages)
-    dellist = []
-    if save_path.exists():
-        for computed in (save_path / "pages").glob("*.mmd"):
-            try:
-                idx = int(computed.stem) - 1
-                if idx in pages:
-                    i = pages.index(idx)
-                    print("skip page", idx + 1)
-                    predictions[i] = computed.read_text(encoding="utf-8")
-                    dellist.append(idx)
-            except Exception as e:
-                print(e)
-    compute_pages = pages.copy()
-    for el in dellist:
-        compute_pages.remove(el)
-    images = rasterize_paper(pdf, pages=compute_pages)
     global model
 
-    dataset = ImageDataset(
-        images,
-        partial(model.encoder.prepare_input, random_padding=False),
-    )
-
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=BATCHSIZE,
-        pin_memory=True,
-        shuffle=False,
-    )
-
-    for idx, sample in tqdm(enumerate(dataloader), total=len(dataloader)):
-        if sample is None:
-            continue
-        model_output = model.inference(image_tensors=sample)
-        for j, output in enumerate(model_output["predictions"]):
-            if model_output["repeats"][j] is not None:
-                if model_output["repeats"][j] > 0:
-                    disclaimer = "\n\n+++ ==WARNING: Truncated because of repetitions==\n%s\n+++\n\n"
-                else:
-                    disclaimer = (
-                        "\n\n+++ ==ERROR: No output for this page==\n%s\n+++\n\n"
-                    )
-                rest = close_envs(model_output["repetitions"][j]).strip()
-                if len(rest) > 0:
-                    disclaimer = disclaimer % rest
-                else:
-                    disclaimer = ""
-            else:
-                disclaimer = ""
-
-            predictions[pages.index(compute_pages[idx * BATCHSIZE + j])] = (
-                markdown_compatible(output) + disclaimer
-            )
-
-    (save_path / "pages").mkdir(parents=True, exist_ok=True)
-    pdf.save(save_path / "doc.pdf")
-    if len(images) > 0:
-        thumb = Image.open(images[0])
-        thumb.thumbnail((400, 400))
-        thumb.save(save_path / "thumb.jpg")
-    for idx, page_num in enumerate(pages):
-        (save_path / "pages" / ("%02d.mmd" % (page_num + 1))).write_text(
-            predictions[idx], encoding="utf-8"
-        )
-    final = "".join(predictions).strip()
-    (save_path / "doc.mmd").write_text(final, encoding="utf-8")
-    return final
+    pdf_file_path = "pdf_dir/2308.13418.pdf"#predict_save(model)
+    response = {
+        "status_ code": HTTPStatus.OK,
+        "data": {"file":pdf_file_path},
+    }
+    return response
 
 
 def main():
     import uvicorn
 
-    uvicorn.run("app:app", port=8503)
+    uvicorn.run("app:app", port=5000)
 
 
 if __name__ == "__main__":
