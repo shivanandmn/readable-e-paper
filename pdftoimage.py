@@ -3,7 +3,6 @@ from os import listdir, mkdir
 from os.path import join, isdir
 from subprocess import call
 import sys
-import datasets
 from shutil import which
 
 COLOR_IMAGE_DPI = 300
